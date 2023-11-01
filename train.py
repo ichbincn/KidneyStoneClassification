@@ -77,6 +77,7 @@ def main(args, logger):
     device = torch.device(args.device if torch.cuda.is_available() else 'cpu')
     seg_net.to(device)
     cla_net.to(device)
+    backbone_oi.to(device)
     ##################
 
     #load pretrainmodel

@@ -6,6 +6,7 @@
 import os
 import numpy as np
 import random
+import torch
 from torch.utils.data import DataLoader, Dataset
 import json
 from skimage.transform import resize

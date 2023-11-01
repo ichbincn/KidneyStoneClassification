@@ -269,8 +269,9 @@ def main(args, logger):
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     scheduler = ExponentialLR(optimizer, gamma=0.99)
-    #data_dir = r'C:\Users\Asus\Desktop\肺腺癌\data\肾结石数据\KdneyStone\202310326结石成分分析龙岗区人民医院李星智'
-    data_dir = '/home/wangchangmiao/kidney/data/data'
+    data_dir = r'C:\Users\Asus\Desktop\肺腺癌\data\肾结石数据\KdneyStone\202310326结石成分分析龙岗区人民医院李星智'
+    if not os.path.exists(data_dir):
+        data_dir = '/home/wangchangmiao/kidney/data/data'
     train_infos, val_infos = split_data(data_dir)
     train_loader = my_dataloader(data_dir, train_infos, batch_size=args.batch_size, size=eval(args.size))
     val_loader = my_dataloader(data_dir, val_infos, batch_size=args.batch_size, size=eval(args.size))

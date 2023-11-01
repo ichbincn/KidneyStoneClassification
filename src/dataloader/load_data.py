@@ -43,6 +43,7 @@ class MyDataset(Dataset):
         image, mask = self.preprocess(image, mask)
         label = self.labels[i]
         return image, mask, label
+
     def preprocess(self, img, mask):
         img = resize(img, self.size)
         mask = resize(mask, self.size)

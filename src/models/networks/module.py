@@ -76,7 +76,7 @@ class ResBlock(nn.Module):
 class ResEncoder(nn.Module):
 
     arch_settings = {
-        9: (ResBlock, (3, 3, 2))
+        7: (ResBlock, (2, 2, 2))
     }
 
     def __init__(self,

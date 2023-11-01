@@ -76,7 +76,7 @@ class ResBlock(nn.Module):
 class ResEncoder(nn.Module):
 
     arch_settings = {
-        9: (ResBlock, (3, 3, 2))
+        7: (ResBlock, (2, 2, 2))
     }
 
     def __init__(self,
@@ -154,7 +154,7 @@ class ResEncoder(nn.Module):
         return out
 
 
-class Zoom_AttNet(nn.Module):
+class CAL_Net(nn.Module):
     def __init__(self, backbone_oi, backbone_mask, backbone_zoom, num_classes=2):
         super().__init__()
         self.oi_encode = backbone_oi

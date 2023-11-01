@@ -11,7 +11,7 @@
 #    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
-
+''''
 
 from torch.cuda.amp import autocast
 import numpy as np
@@ -461,3 +461,4 @@ if __name__ == '__main__':
 
     print(SegmentationNetwork._compute_steps_for_sliding_window(
         (123, 54, 123), (246, 162, 369), 0.25))
+'''

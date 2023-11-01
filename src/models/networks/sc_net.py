@@ -91,7 +91,7 @@ class ResBlock(nn.Module):
         out = out + residual
 
         return out
-class SC_Net(SegmentationNetwork):
+class SC_Net(nn.Module):
     def __init__(self,
         in_channels: 384,
         out_channels: int,
@@ -171,28 +171,28 @@ class SC_Net(SegmentationNetwork):
 
         self.resencoder = ResEncoder(depth=7)
 
-        def forward(self, res_encoder_output):
-            #res_encoder_output = self.resencoder(x)
-            transencoder_output,hidden_states_out = self.vit(res_encoder_output[2])
-            skip2 = self.transposeconv_skip2(hidden_states_out[-3])
-            x = torch.cat(res_encoder_output[2],x,skip2,dim=1)
-            x = self.stage2_de(x)
-            x = self.transposeconv_stage2(x)
-            skip1 = self.transposeconv_skip1_1(hidden_states_out[-5])
-            skip1 = self.transposeconv_skip1_2(skip1)
-            x = torch.cat(res_encoder_output[1],x,skip1,dim=1)
-            x = self.stage1_de(x)
-            x = self.transposeconv_stage1(x)
-            skip0 = self.transposeconv_skip0_1(hidden_states_out[-7])
-            skip0 = self.transposeconv_skip0_2(skip0)
-            skip0 = self.transposeconv_skip0_3(skip0)
-            x = torch.cat(res_encoder_output[0],x,skip0,dim=1)
-            x = self.stage0_de(x)
-            x = self.transposeconv_stage0(x)
-            output = self.cls_conv(x)
-            output = nn.Sigmoid(output)
+    def forward(self, res_encoder_output):
+        #res_encoder_output = self.resencoder(x)
+        transencoder_output,hidden_states_out = self.vit(res_encoder_output[2])
+        skip2 = self.transposeconv_skip2(hidden_states_out[-3])
+        x = torch.cat(res_encoder_output[2],x,skip2,dim=1)
+        x = self.stage2_de(x)
+        x = self.transposeconv_stage2(x)
+        skip1 = self.transposeconv_skip1_1(hidden_states_out[-5])
+        skip1 = self.transposeconv_skip1_2(skip1)
+        x = torch.cat(res_encoder_output[1],x,skip1,dim=1)
+        x = self.stage1_de(x)
+        x = self.transposeconv_stage1(x)
+        skip0 = self.transposeconv_skip0_1(hidden_states_out[-7])
+        skip0 = self.transposeconv_skip0_2(skip0)
+        skip0 = self.transposeconv_skip0_3(skip0)
+        x = torch.cat(res_encoder_output[0],x,skip0,dim=1)
+        x = self.stage0_de(x)
+        x = self.transposeconv_stage0(x)
+        output = self.cls_conv(x)
+        output = nn.Sigmoid(output)
 
-            return output
+        return output
 
 
 

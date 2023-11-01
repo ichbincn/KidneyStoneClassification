@@ -99,6 +99,8 @@ class ResEncoder(nn.Module):
         self.layer2 = self._make_layer(block, 384, layers[1], stride=(2, 2, 2), norm_cfg=norm_cfg, activation_cfg=activation_cfg, weight_std=weight_std)
         self.layer3 = self._make_layer(block, 384, layers[2], stride=(2, 2, 2), norm_cfg=norm_cfg, activation_cfg=activation_cfg, weight_std=weight_std)
         self.layers = []
+        #特征图16*16*16*384
+        #
 
         for m in self.modules():
             if isinstance(m, (nn.Conv3d, Conv3d_wd)):

@@ -20,7 +20,7 @@ from torch import nn
 import torch
 from scipy.ndimage.filters import gaussian_filter
 from typing import Union, Tuple, List
-
+from monai.networks.nets import ViT
 
 class no_op(object):
     def __enter__(self):

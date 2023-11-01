@@ -21,7 +21,8 @@ from torch.utils.data import DataLoader
 from torch.nn import DataParallel
 import itertools
 import functools
-
+import sklearn.metrics
+from sklearn.metrics import accuracy_score
 
 
 class Logger:

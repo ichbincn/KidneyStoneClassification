@@ -154,7 +154,7 @@ class ResEncoder(nn.Module):
         return out
 
 
-class Zoom_AttNet(nn.Module):
+class CAL_Net(nn.Module):
     def __init__(self, backbone_oi, backbone_mask, backbone_zoom, num_classes=2):
         super().__init__()
         self.oi_encode = backbone_oi

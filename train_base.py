@@ -140,7 +140,7 @@ class Trainer:
             self.epoch = epoch
             end = time.time()
             print("Epoch: {}, train time: {}".format(epoch, end - start))
-            if epoch % 5 == 0:
+            if epoch % 1 == 0:
                 self.evaluate()
 
     def load_model(self):
@@ -164,7 +164,7 @@ class Trainer:
                 loss = self.loss_function(logits, label)
                 per_epoch_loss += loss.item()
             test_acc = per_epoch_num_correct/total_step
-            print(f'Epoch:{self.epoch}/{len(self.epochs)}, Loss:{per_epoch_loss}, acc:{test_acc}')
+            print(f'Epoch:{self.epoch}/{self.epochs}, Loss:{per_epoch_loss}, acc:{test_acc}')
 
             if self.epoch % self.args.save_epoch == 0:
                 checkpoint = {
@@ -203,6 +203,7 @@ class Trainer:
             x = x.to(self.device)
             label = label.to(self.device)
             logits = self.model(x)
+
             loss = self.loss_function(logits, label)
             self.per_epoch_loss += loss.item()
             self.total_step += x.shape[0]
@@ -211,6 +212,7 @@ class Trainer:
             loss.backward()
             self.optimizer.step()
             pred = logits.argmax(dim=1)
+            print(f'logits:{logits}, pred:{pred}, label:{label}')
             self.num_correct += torch.eq(pred, label).sum().item()
             if inx % 5 == 0:
                 print(f'iters:{inx}/{len(self.train_loader)}, Loss:{loss.item()}, acc:{self.num_correct/self.total_step}')
@@ -267,7 +269,7 @@ def main(args, logger):
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     scheduler = ExponentialLR(optimizer, gamma=0.99)
-    # data_dir = r'C:\Users\Asus\Desktop\肺腺癌\data\肾结石数据\KdneyStone\202310326结石成分分析龙岗区人民医院李星智'
+    #data_dir = r'C:\Users\Asus\Desktop\肺腺癌\data\肾结石数据\KdneyStone\202310326结石成分分析龙岗区人民医院李星智'
     data_dir = '/home/wangchangmiao/kidney/data/data'
     train_infos, val_infos = split_data(data_dir)
     train_loader = my_dataloader(data_dir, train_infos, batch_size=args.batch_size, size=eval(args.size))

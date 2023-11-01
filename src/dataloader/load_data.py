@@ -42,7 +42,7 @@ class MyDataset(Dataset):
         mask = np.load(os.path.join(self.mask_dir, f"{self.ids[i]}-mask.npy")).astype('float64')
         image, mask = self.preprocess(image, mask)
         label = self.labels[i]
-        return image, mask, label
+        return torch.Tensor(np.array([image])), torch.Tensor(np.array([mask])), label
     def preprocess(self, img, mask):
         img = resize(img, self.size)
         mask = resize(mask, self.size)

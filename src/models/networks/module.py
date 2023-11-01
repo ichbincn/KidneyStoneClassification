@@ -155,11 +155,12 @@ class ResEncoder(nn.Module):
 
 
 class CAL_Net(nn.Module):
-    def __init__(self, backbone_oi, backbone_mask, backbone_zoom, num_classes=2):
+    def __init__(self, backbone_mask, backbone_zoom, num_classes=2):
         super().__init__()
-        self.oi_encode = backbone_oi
+        #self.oi_encode = backbone_oi
         self.mask_encode = backbone_mask
         self.zoom_encode = backbone_zoom
+        #self.feature_oi = None
 
         in_dim = 512
         self.query_conv = nn.Conv3d(in_dim, in_dim // 8, kernel_size=1)
@@ -184,7 +185,7 @@ class CAL_Net(nn.Module):
 
     def forward(self, x, y, z):
         # encode
-        feature_oi = self.oi_encode(x)[-1]  # B*512*H*W
+        feature_oi = x[-1]  # B*512*H*W
         feature_zoom = self.zoom_encode(y)[-1]
         feature_mask = self.mask_encode(z)[-1]
 

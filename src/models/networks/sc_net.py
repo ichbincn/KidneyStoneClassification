@@ -171,8 +171,8 @@ class SC_Net(SegmentationNetwork):
 
         self.resencoder = ResEncoder(depth=7)
 
-        def forward(self, x):
-            res_encoder_output = self.resencoder(x)
+        def forward(self, res_encoder_output):
+            #res_encoder_output = self.resencoder(x)
             transencoder_output,hidden_states_out = self.vit(res_encoder_output[2])
             skip2 = self.transposeconv_skip2(hidden_states_out[-3])
             x = torch.cat(res_encoder_output[2],x,skip2,dim=1)

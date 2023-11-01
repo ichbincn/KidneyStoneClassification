@@ -68,7 +68,7 @@ def main(args, logger):
     backbone_oi = ResEncoder(depth=7, in_channels=1)
     backbone_zoom = ResEncoder(depth=7, in_channels=2)
     backbone_mask = ResEncoder(depth=7, in_channels=1)
-    cla_net = CAL_Net(backbone_oi, backbone_mask, backbone_zoom, num_classes=args.num_classes)
+    cla_net = CAL_Net(backbone_mask, backbone_zoom, num_classes=args.num_classes)
 
     seg_net = DataParallel(seg_net)
     cla_net = DataParallel(cla_net)
@@ -176,14 +176,15 @@ def main(args, logger):
             cla_loss = 0
             cam_loss = 0
             if train_seg:
-                pred_mask = seg_net(img)
+                res_encoder_output = backbone_oi(img)
+                pred_mask = seg_net(res_encoder_output)
                 #pred_mask = activation(pred_mask)
                 seg_loss += criterion_seg(pred_mask, seg_label)
                 pred_mask = torch.where(pred_mask > 0.5, 1, 0).byte()
 
                 if train_cla:
                     original_seg, zoom_seg = generate_patch_mask(img, pred_mask)
-                    cla_out = cla_net(img, zoom_seg, original_seg)
+                    cla_out = cla_net(res_encoder_output, zoom_seg, original_seg)
 
                     features = cla_net.finalconv
                     fc_weights = cla_net.fc.weight.data
@@ -203,8 +204,9 @@ def main(args, logger):
                     metrics_seg_values[k].update(res, bs)
             else:
                 if train_cla:
+                    res_encoder_output = backbone_oi(img)
                     original_seg, zoom_seg = generate_patch_mask(img, seg_label)
-                    cla_out = cla_net(img, zoom_seg, original_seg)
+                    cla_out = cla_net(res_encoder_output, zoom_seg, original_seg)
                     features = cla_net.finalconv
                     fc_weights = cla_net.fc.weight.data
                     cams = returnCAM(features, fc_weights, cla_label)
@@ -291,19 +293,18 @@ def main(args, logger):
                 seg_loss = 0
                 cla_loss = 0
                 if train_seg:
-                    pred_mask = seg_net(img)
+                    res_encoder_output = backbone_oi(img)
+                    pred_mask = seg_net(res_encoder_output)
                     #pred_mask = activation(pred_mask)
                     seg_loss += criterion_seg(pred_mask, seg_label)
                     pred_mask = torch.where(pred_mask > 0.5, 1, 0).byte()
 
                     if train_cla:
                         original_seg, zoom_seg = generate_patch_mask(img, pred_mask)
-
-                        img = img.to(device)
                         original_seg = original_seg.to(device)
                         zoom_seg = zoom_seg.to(device)
 
-                        cla_out = cla_net(img, zoom_seg, original_seg)
+                        cla_out = cla_net(res_encoder_output, zoom_seg, original_seg)
 
                         cla_loss += criterion_cla(cla_out, cla_label)
 
@@ -323,8 +324,9 @@ def main(args, logger):
                         img = img.to(device)
                         original_seg = original_seg.to(device)
                         zoom_seg = zoom_seg.to(device)
+                        res_encoder_output = backbone_oi(img)
 
-                        cla_out = cla_net(img, zoom_seg, original_seg)
+                        cla_out = cla_net(res_encoder_output, zoom_seg, original_seg)
 
                         cla_loss += criterion_cla(cla_out, cla_label)
 

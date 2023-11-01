@@ -64,7 +64,7 @@ def main(args, logger):
     test_writer = SummaryWriter(os.path.join(summary_dir, 'test'), flush_secs=2)
 
     #model
-    seg_net = SC_Net()
+    seg_net = SC_Net(in_channels=384,out_channels=None,img_size=(32,32,16))
     backbone_oi = ResEncoder(depth=7, in_channels=1)
     backbone_zoom = ResEncoder(depth=7, in_channels=2)
     backbone_mask = ResEncoder(depth=7, in_channels=1)
@@ -392,11 +392,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config_file', type=str, default='configs/config.yaml')
     parser.add_argument('--task', type=list, default=[0, 1])
-    parser.add_argument('--pretrain_seg', type=str, default='')
-    parser.add_argument('--pretrain_cla', type=str, default='')
-    parser.add_argument('--input_path', type=str, default='')
+    parser.add_argument('--pretrain_seg', type=str, default='None')
+    parser.add_argument('--pretrain_cla', type=str, default='None')
+    parser.add_argument('--input_path', type=str, default='/home/KidneyData/data')
     parser.add_argument('--output_path', type=str, default='./results')
-    parser.add_argument('--input_size', type=tuple, default=(256, 256, 256))
+    parser.add_argument('--input_size', type=tuple, default=(256, 256, 128))
     parser.add_argument('--num_classes', type=int, default=2)
     parser.add_argument('--epochs', type=int, default=30)
     parser.add_argument('--save_epoch', type=int, default=3)
@@ -408,7 +408,7 @@ if __name__ == '__main__':
     parser.add_argument('--milestones', type=list, default=[100])
     parser.add_argument('--gamma', type=float, default=0.1)
     parser.add_argument('--loss_weights', type=list, default=[0.2, 1, 1])
-    parser.add_argument('--log_dir', type=str, default='./Loger')
+    parser.add_argument('--log_dir', type=str, default='./Logs')
     parser.add_argument('--save_dir', type=str, default='./Save')
     parser.add_argument('--num_workers', type=int, default=0)
 

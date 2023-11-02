@@ -410,7 +410,11 @@ if __name__ == '__main__':
     parser.add_argument('--pretrain_cla', type=str, default='None')
     parser.add_argument('--input_path', type=str, default='/home/KidneyData/data')
     parser.add_argument('--output_path', type=str, default='./results')
+<<<<<<< HEAD
     parser.add_argument('--input_size', type=tuple, default=(256, 256, 256))
+=======
+    parser.add_argument('--input_size', type=tuple, default=(64, 64, 64))
+>>>>>>> 7b61754c3e71aee6f37a3a00232a1dc679f066b2
     parser.add_argument('--num_classes', type=int, default=2)
     parser.add_argument('--epochs', type=int, default=10)
     parser.add_argument('--save_epoch', type=int, default=3)

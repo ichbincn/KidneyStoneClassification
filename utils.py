@@ -82,10 +82,10 @@ def returnCAM(feature_conv, weight_softmax, idx, size=(256, 256, 256)):
     for i in range(bz):
         cam_bi = torch.matmul(weight_softmax[idx[i], :], feature_conv[i, :, :])
         cam_bi = cam_bi.reshape((1, h, w, d))
-
         cam_img = (cam_bi - cam_bi.min()) / (cam_bi.max() - cam_bi.min())  # normalize
-        cam_img = resize(cam_img, size)
+        cam_img = resize(cam_img.to('cpu').detach().numpy()[0], size)
         cam_img = torch.Tensor(cam_img)
+        cam_img = cam_img.unsqueeze(0)
         cam_img = cam_img.unsqueeze(0)
 
         cams.append(cam_img)

@@ -212,7 +212,7 @@ class Trainer:
             loss.backward()
             self.optimizer.step()
             pred = logits.argmax(dim=1)
-            print(f'logits:{logits}, pred:{pred}, label:{label}')
+            # print(f'logits:{logits}, pred:{pred}, label:{label}')
             self.num_correct += torch.eq(pred, label).sum().item()
             if inx % 5 == 0:
                 print(f'iters:{inx}/{len(self.train_loader)}, Loss:{loss.item()}, acc:{self.num_correct/self.total_step}')

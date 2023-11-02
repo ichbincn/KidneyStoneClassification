@@ -6,6 +6,7 @@
 import os
 import numpy as np
 import random
+import torch
 from torch.utils.data import DataLoader, Dataset
 import json
 from skimage.transform import resize
@@ -42,7 +43,8 @@ class MyDataset(Dataset):
         mask = np.load(os.path.join(self.mask_dir, f"{self.ids[i]}-mask.npy")).astype('float64')
         image, mask = self.preprocess(image, mask)
         label = self.labels[i]
-        return image, mask, label
+
+        return torch.Tensor(np.array([image])), torch.tensor(np.array([mask]), dtype=torch.uint8), label
 
     def preprocess(self, img, mask):
         img = resize(img, self.size)
@@ -61,10 +63,12 @@ def my_dataloader(data_dir, infos, batch_size=3, shuffle=True, num_workers=0, si
 # data_dir = r'C:\Users\Asus\Desktop\肺腺癌\data\肾结石数据\KdneyStone\202310326结石成分分析龙岗区人民医院李星智'
 #
 # train_info, test_info = split_data(data_dir, rate=0.8)
-# train_dataloader = my_dataloader(data_dir, train_info)
+# train_dataloader = my_dataloader(data_dir, train_info, size=(256, 256, 256))
 # test_dataloader = my_dataloader(data_dir, test_info)
 # for i, (image, mask, label) in enumerate(train_dataloader):
 #     print(i,  image.shape, mask.shape, label)
-#
+#     print(mask.sum())
+
+
 # for i, (image, mask, label) in enumerate(test_dataloader):
 #     print(i,  image.shape, mask.shape, label)

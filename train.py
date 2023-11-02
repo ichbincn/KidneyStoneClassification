@@ -21,7 +21,8 @@ from torch.utils.data import DataLoader
 from torch.nn import DataParallel
 import itertools
 import functools
-
+import sklearn.metrics
+from sklearn.metrics import accuracy_score
 
 
 class Logger:
@@ -64,18 +65,20 @@ def main(args, logger):
     test_writer = SummaryWriter(os.path.join(summary_dir, 'test'), flush_secs=2)
 
     #model
-    seg_net = SC_Net(in_channels=384,out_channels=None,img_size=(32,32,16))
+    img_size = tuple([i//8 for i in args.input_size])
+    seg_net = SC_Net(in_channels=384, out_channels=None, img_size=img_size)
     backbone_oi = ResEncoder(depth=7, in_channels=1)
     backbone_zoom = ResEncoder(depth=7, in_channels=2)
     backbone_mask = ResEncoder(depth=7, in_channels=1)
-    cla_net = CAL_Net(backbone_oi, backbone_mask, backbone_zoom, num_classes=args.num_classes)
+    cla_net = CAL_Net(backbone_mask, backbone_zoom, num_classes=args.num_classes)
 
-    seg_net = DataParallel(seg_net)
-    cla_net = DataParallel(cla_net)
+    #seg_net = DataParallel(seg_net)
+    #cla_net = DataParallel(cla_net)
 
     device = torch.device(args.device if torch.cuda.is_available() else 'cpu')
     seg_net.to(device)
     cla_net.to(device)
+    backbone_oi.to(device)
     ##################
 
     #load pretrainmodel
@@ -114,8 +117,12 @@ def main(args, logger):
     ############
 
     metrics_seg_list = config.get_parsed_content("VALIDATION#metrics#seg")
+
     metrics_seg = {k.func.__name__: k for k in metrics_seg_list if type(k) == functools.partial}
+
     metrics_seg.update({k.__class__.__name__: k for k in metrics_seg_list if type(k) != functools.partial})
+
+
     metrics_cla_list = config.get_parsed_content("VALIDATION#metrics#cla")
     metrics_cla = {}
     for k in metrics_cla_list:
@@ -176,19 +183,20 @@ def main(args, logger):
             cla_loss = 0
             cam_loss = 0
             if train_seg:
-                pred_mask = seg_net(img)
+                res_encoder_output = backbone_oi(img)
+                pred_mask = seg_net(res_encoder_output)
                 #pred_mask = activation(pred_mask)
                 seg_loss += criterion_seg(pred_mask, seg_label)
                 pred_mask = torch.where(pred_mask > 0.5, 1, 0).byte()
 
                 if train_cla:
                     original_seg, zoom_seg = generate_patch_mask(img, pred_mask)
-                    cla_out = cla_net(img, zoom_seg, original_seg)
+                    cla_out = cla_net(res_encoder_output, zoom_seg, original_seg)
 
                     features = cla_net.finalconv
                     fc_weights = cla_net.fc.weight.data
                     cams = returnCAM(features, fc_weights, cla_label, size=args.input_size)
-
+                    cams = cams.to(device)
                     cam_loss += criterion_cam(cams, seg_label)
 
                     cla_loss += criterion_cla(cla_out, cla_label)
@@ -197,14 +205,20 @@ def main(args, logger):
                     cla_pred.append(F.softmax(cla_out, dim=-1).argmax(1, keepdim=True).cpu())
 
                 for k in metrics_seg:
+
                     res = metrics_seg[k](pred_mask, seg_label)
+                    print(res, pred_mask, seg_label)
+
                     if type(res) == torch.Tensor and res.shape[0] > 0:
                         res = torch.mean(res[~torch.isnan(res)])
                     metrics_seg_values[k].update(res, bs)
+                break
+
             else:
                 if train_cla:
+                    res_encoder_output = backbone_oi(img)
                     original_seg, zoom_seg = generate_patch_mask(img, seg_label)
-                    cla_out = cla_net(img, zoom_seg, original_seg)
+                    cla_out = cla_net(res_encoder_output, zoom_seg, original_seg)
                     features = cla_net.finalconv
                     fc_weights = cla_net.fc.weight.data
                     cams = returnCAM(features, fc_weights, cla_label)
@@ -291,19 +305,18 @@ def main(args, logger):
                 seg_loss = 0
                 cla_loss = 0
                 if train_seg:
-                    pred_mask = seg_net(img)
+                    res_encoder_output = backbone_oi(img)
+                    pred_mask = seg_net(res_encoder_output)
                     #pred_mask = activation(pred_mask)
                     seg_loss += criterion_seg(pred_mask, seg_label)
                     pred_mask = torch.where(pred_mask > 0.5, 1, 0).byte()
 
                     if train_cla:
                         original_seg, zoom_seg = generate_patch_mask(img, pred_mask)
-
-                        img = img.to(device)
                         original_seg = original_seg.to(device)
                         zoom_seg = zoom_seg.to(device)
 
-                        cla_out = cla_net(img, zoom_seg, original_seg)
+                        cla_out = cla_net(res_encoder_output, zoom_seg, original_seg)
 
                         cla_loss += criterion_cla(cla_out, cla_label)
 
@@ -323,8 +336,9 @@ def main(args, logger):
                         img = img.to(device)
                         original_seg = original_seg.to(device)
                         zoom_seg = zoom_seg.to(device)
+                        res_encoder_output = backbone_oi(img)
 
-                        cla_out = cla_net(img, zoom_seg, original_seg)
+                        cla_out = cla_net(res_encoder_output, zoom_seg, original_seg)
 
                         cla_loss += criterion_cla(cla_out, cla_label)
 
@@ -394,11 +408,11 @@ if __name__ == '__main__':
     parser.add_argument('--task', type=list, default=[0, 1])
     parser.add_argument('--pretrain_seg', type=str, default='None')
     parser.add_argument('--pretrain_cla', type=str, default='None')
-    parser.add_argument('--input_path', type=str, default=r'C:\Users\Asus\Desktop\肺腺癌\data\肾结石数据\KdneyStone\202310326结石成分分析龙岗区人民医院李星智')
+    parser.add_argument('--input_path', type=str, default='/home/KidneyData/data')
     parser.add_argument('--output_path', type=str, default='./results')
-    parser.add_argument('--input_size', type=tuple, default=(32, 32, 32))
+    parser.add_argument('--input_size', type=tuple, default=(256, 256, 256))
     parser.add_argument('--num_classes', type=int, default=2)
-    parser.add_argument('--epochs', type=int, default=30)
+    parser.add_argument('--epochs', type=int, default=10)
     parser.add_argument('--save_epoch', type=int, default=3)
     parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--device', type=str, default='cuda')

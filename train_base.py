@@ -24,6 +24,8 @@ import torch.nn as nn
 from src.dataloader.load_data import split_data, my_dataloader
 
 from torch.nn.parallel import DataParallel
+from torchvision import models
+
 
 
 class ResidualBlock(nn.Module):
@@ -163,8 +165,10 @@ class Trainer:
                 logits = self.model(x)
                 loss = self.loss_function(logits, label)
                 per_epoch_loss += loss.item()
-            test_acc = per_epoch_num_correct/total_step
-            print(f'Epoch:{self.epoch}/{self.epochs}, Loss:{per_epoch_loss}, acc:{test_acc}')
+                pred = logits.argmax(dim=1)
+                per_epoch_num_correct += torch.eq(pred, label).sum().item()
+            test_acc = per_epoch_num_correct / total_step
+            print(f'TEST: Epoch:{self.epoch}/{self.epochs}, Loss:{per_epoch_loss}, acc:{test_acc}')
 
             if self.epoch % self.args.save_epoch == 0:
                 checkpoint = {
@@ -217,52 +221,15 @@ class Trainer:
             if inx % 5 == 0:
                 print(f'iters:{inx}/{len(self.train_loader)}, Loss:{loss.item()}, acc:{self.num_correct/self.total_step}')
 
-def train_one_epoch(model, optimizer, data_loader, device):
-    total_step = len(data_loader)
-    per_epoch_loss = 0
-    num_correct = 0
-    model.train()
-    loss_function = torch.nn.CrossEntropyLoss()
-    with torch.enable_grad():
-        for inx, (x, mask, label) in enumerate(data_loader):
-            x = x.to(device)
-            label = label.to(device)
-
-            logits = model(x)
-            # print(logits, label)
-            loss = loss_function(logits, label)
-            per_epoch_loss += loss.item()
-            # print(loss.item())
-
-            # Backward and optimize
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            pred = logits.argmax(dim=1)
-            print(f'pred:{pred}, label:{label}')
-            num_correct += torch.eq(pred, label).sum().float().item()
-        train_loss = per_epoch_loss / total_step
-        train_acc = num_correct / x.shape[0]
-    return train_loss, train_acc
-
-def evaluate(model, data_loader, device):
-    val_num_correct = 0
-    model.eval()
-    with torch.no_grad():
-        for x, mask, label in tqdm(data_loader):
-            x = x.to(device)
-            label = label.to(device)
-            logits = model(x)
-            pred = logits.argmax(dim=1)
-            val_num_correct += torch.eq(pred, label).sum().float().item()
-        val_acc = val_num_correct / x.shape[0]
-    return val_acc
-
 def main(args, logger):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print("can use {} gpus".format(torch.cuda.device_count()))
     print(device)
-    model = ResNet(ResidualBlock, [2, 2, 2, 2], num_classes=args.num_classes)
+    # model = ResNet(ResidualBlock, [2, 2, 2, 2], num_classes=args.num_classes)
+    model = models.resnet18(pretrained=True)
+    num_ftrs = model.fc.in_features  # 获取低级特征维度
+    model.fc = nn.Linear(num_ftrs, args.num_classes)  # 替换新的输出层
+
     if torch.cuda.device_count() > 1:
         model = DataParallel(model)
     model.to(device)
@@ -273,8 +240,8 @@ def main(args, logger):
     if not os.path.exists(data_dir):
         data_dir = '/home/wangchangmiao/kidney/data/data'
     train_infos, val_infos = split_data(data_dir)
-    train_loader = my_dataloader(data_dir, train_infos, batch_size=args.batch_size, size=eval(args.size))
-    val_loader = my_dataloader(data_dir, val_infos, batch_size=args.batch_size, size=eval(args.size))
+    train_loader = my_dataloader(data_dir, train_infos, batch_size=args.batch_size, resize_rate=args.resize_rate)
+    val_loader = my_dataloader(data_dir, val_infos, batch_size=args.batch_size, resize_rate=args.resize_rate)
     logger.logger.info('start training......\n')
     summaryWriter = SummaryWriter(log_dir=args.log_dir)
     trainer = Trainer(model,
@@ -287,56 +254,6 @@ def main(args, logger):
                       args)
     trainer()
 
-    # best_acc = 0
-    # for epoch in range(args.epochs):
-    #     start = time.time()
-    #     train_loss, train_acc = train_one_epoch(model, optimizer, train_loader, device)
-    #     print("Train Epoch: {}\t Loss: {:.3f}\t Acc: {:.3f}".format(epoch, train_loss, train_acc))
-    #     summaryWriter.add_scalars('loss', {"loss": train_loss}, epoch)
-    #     summaryWriter.add_scalars('acc', {"acc": train_acc}, epoch)
-    #     logger.logger.info('%d epoch train loss: %.3f \n' % (epoch, train_loss))
-    #     logger.logger.info('%d epoch train acc: %.3f \n' % (epoch, train_acc))
-    #
-    #     scheduler.step()
-    #
-    #     val_acc = evaluate(model, val_loader, device)
-    #     num_params = sum([param.nelement() for param in model.parameters()])
-    #     print("val Epoch: {}\t Acc: {:.3f}\t time: {:.3f}".format(epoch, val_acc, time.time()-start))
-    #     print("total params: {:.3f}".format(num_params))
-    #     summaryWriter.add_scalars('acc', {"val_acc": val_acc}, epoch)
-    #     summaryWriter.add_scalars('time', {"time": (time.time() - start)}, epoch)
-    #     logger.logger.info('%d epoch validation acc: %.3f \n' % (epoch, val_acc))
-    #     logger.logger.info('%d epoch cost time: %.3f \n' % (epoch, time.time()-start))
-    #     logger.logger.info('%d epoch total params: %.3f \n' % (epoch, num_params))
-    #
-    #     if epoch % args.save_epoch == 0:
-    #         checkpoint = {
-    #             'model_state_dict': model.state_dict(),  # *模型参数
-    #             'optimizer_state_dict': optimizer.state_dict(),  # *优化器参数
-    #             'scheduler_state_dict': scheduler.state_dict(),  # *scheduler
-    #             'best_val_score': val_acc,
-    #             'num_params': num_params,
-    #             'epoch': epoch
-    #         }
-    #         torch.save(checkpoint, os.path.join(args.save_dir, 'checkpoint-%d.pth' % epoch))
-    #         logger.logger.info('save model %d successed......\n'%epoch)
-    #
-    #     if best_acc < val_acc:
-    #         best_acc = val_acc
-    #         logger.logger.info('best model in %d epoch, train acc: %.3f \n' % (epoch, train_acc))
-    #         logger.logger.info('best model in %d epoch, validation acc: %.3f \n' % (epoch, val_acc))
-    #         checkpoint = {
-    #             'model_state_dict': model.state_dict(),  # *模型参数
-    #             'optimizer_state_dict': optimizer.state_dict(),  # *优化器参数
-    #             'scheduler_state_dict': scheduler.state_dict(),  # *scheduler
-    #             'best_val_score': best_acc,
-    #             'num_params': num_params,
-    #             'epoch': epoch
-    #         }
-    #         torch.save(checkpoint, os.path.join(args.save_dir, 'best_checkpoint.pt'))
-    #         logger.logger.info('save best model  successed......\n')
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--num_classes', type=int, default=2)
@@ -344,10 +261,10 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=1)
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--save_epoch', type=int, default=5)
-    parser.add_argument('--log_dir', type=str, default='./')
-    parser.add_argument('--save_dir', type=str, default='./')
+    parser.add_argument('--log_dir', type=str, default='./Logs')
+    parser.add_argument('--save_dir', type=str, default='./models')
     parser.add_argument('--num_workers', type=int, default=0)
-    parser.add_argument('--size', type=str, default="(32, 32, 32)")
+    parser.add_argument('--resize_rate', type=float, default=0.25)
     parser.add_argument('--MODEL_WEIGHT', type=str, default=None)
 
     opt = parser.parse_args()

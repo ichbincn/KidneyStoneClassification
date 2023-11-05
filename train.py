@@ -65,11 +65,12 @@ def main(args, logger):
     test_writer = SummaryWriter(os.path.join(summary_dir, 'test'), flush_secs=2)
 
     #model
-    img_size = tuple([i//8 for i in args.input_size])
+    img_size = tuple([int((512*args.resize_rate) // 8) for i in range(3)])
+    # print("model img_size input:",img_size)
     seg_net = SC_Net(in_channels=384, out_channels=None, img_size=img_size)
-    backbone_oi = ResEncoder(depth=7, in_channels=1)
-    backbone_zoom = ResEncoder(depth=7, in_channels=2)
-    backbone_mask = ResEncoder(depth=7, in_channels=1)
+    backbone_oi = ResEncoder(depth=4, in_channels=1)
+    backbone_zoom = ResEncoder(depth=4, in_channels=2)
+    backbone_mask = ResEncoder(depth=4, in_channels=1)
     cla_net = CAL_Net(backbone_mask, backbone_zoom, num_classes=args.num_classes)
 
     #seg_net = DataParallel(seg_net)
@@ -141,13 +142,13 @@ def main(args, logger):
                                batch_size=args.batch_size,
                                shuffle=True,
                                num_workers=args.num_workers,
-                               size=args.input_size)
+                               resize_rate=args.resize_rate)
     test_data_loader = my_dataloader(args.input_path,
-                             val_info,
-                             batch_size=args.batch_size,
-                             shuffle=False,
-                             num_workers=args.num_workers,
-                             size=args.input_size)
+                            val_info,
+                            batch_size=args.batch_size,
+                            shuffle=False,
+                            num_workers=args.num_workers,
+                            resize_rate=args.resize_rate)
     #########################
 
     print("Start training")
@@ -159,9 +160,8 @@ def main(args, logger):
     metrics_seg_values = {k: AverageMeter() for k in metrics_seg}
     best_metric = {k:{"epoch":0, "value":0} for k in config["VALIDATION"]["save_best_metric"]}
 
-    for epoch in range(args.epochs):
+    for epoch in tqdm(range(args.epochs)):
         s_t = time.time()
-
         seg_net.train()
         cla_net.train()
         running_loss.reset()
@@ -173,7 +173,9 @@ def main(args, logger):
         gt = []
         cla_pred = []
 
-        for batch_idx, (img, seg_label, cla_label) in enumerate(train_data_loader):
+        for batch_idx, (img, seg_label, cla_label) in tqdm(enumerate(train_data_loader), total=len(train_data_loader)):
+            if batch_idx > 100:
+                break
             bs, c, h, w, d = img.shape
             img = img.to(device)
             seg_label = seg_label.to(device)
@@ -195,7 +197,7 @@ def main(args, logger):
 
                     features = cla_net.finalconv
                     fc_weights = cla_net.fc.weight.data
-                    cams = returnCAM(features, fc_weights, cla_label, size=args.input_size)
+                    cams = returnCAM(features, fc_weights, cla_label, size=tuple([int(i*8) for i in img_size]))
                     cams = cams.to(device)
                     cam_loss += criterion_cam(cams, seg_label)
 
@@ -207,12 +209,9 @@ def main(args, logger):
                 for k in metrics_seg:
 
                     res = metrics_seg[k](pred_mask, seg_label)
-                    print(res, pred_mask, seg_label)
-
                     if type(res) == torch.Tensor and res.shape[0] > 0:
                         res = torch.mean(res[~torch.isnan(res)])
                     metrics_seg_values[k].update(res, bs)
-                break
 
             else:
                 if train_cla:
@@ -245,6 +244,7 @@ def main(args, logger):
             # if train_cla:
             #     gt.append(cla_label.cpu())
             #     cla_pred.append(F.softmax(cla_out, dim=-1).argmax(1, keepdim=True).cpu())
+
 
         if train_cla:
             gt = torch.cat(gt, dim=0)
@@ -280,126 +280,129 @@ def main(args, logger):
             torch.save(seg_net.state_dict(), os.path.join(model_dir, "seg_net_params_epo-{}.pkl".format(epoch)))
             torch.save(cla_net.state_dict(), os.path.join(model_dir, "cla_net_params_epo-{}.pkl".format(epoch)))
 
-        print("Start testing...")
-        logger.logger.info('Start testing......\n')
-        s_t = time.time()
-        seg_net.eval()
-        cla_net.eval()
-        running_loss.reset()
-        running_loss_seg.reset()
-        running_loss_cla.reset()
-        for k in metrics_seg_values:
-            metrics_seg_values[k].reset()
-
-        gt = []
-        cla_pred = []
-
-        with torch.no_grad():
-
-            for batch_idx, (img, seg_label, cla_label) in enumerate(test_data_loader):
-                bs, c, h, w, d = img.shape
-                img = img.to(device)
-                seg_label = seg_label.to(device)
-                cla_label = cla_label.to(device)
-
-                seg_loss = 0
-                cla_loss = 0
-                if train_seg:
-                    res_encoder_output = backbone_oi(img)
-                    pred_mask = seg_net(res_encoder_output)
-                    #pred_mask = activation(pred_mask)
-                    seg_loss += criterion_seg(pred_mask, seg_label)
-                    pred_mask = torch.where(pred_mask > 0.5, 1, 0).byte()
-
-                    if train_cla:
-                        original_seg, zoom_seg = generate_patch_mask(img, pred_mask)
-                        original_seg = original_seg.to(device)
-                        zoom_seg = zoom_seg.to(device)
-
-                        cla_out = cla_net(res_encoder_output, zoom_seg, original_seg)
-
-                        cla_loss += criterion_cla(cla_out, cla_label)
-
-                        gt.append(cla_label.cpu())
-                        cla_pred.append(F.softmax(cla_out, dim=-1).argmax(1, keepdim=True).cpu())
-
-                    seg_label = seg_label.byte()
-                    for k in metrics_seg:
-                        res = metrics_seg[k](pred_mask, seg_label)
-                        if type(res) == torch.Tensor and res.shape[0] > 0:
-                            res = torch.mean(res[~torch.isnan(res)])
-                        metrics_seg_values[k].update(res, bs)
-
-                else:
-                    if train_cla:
-                        original_seg, zoom_seg = generate_patch_mask(img, seg_label)
-                        img = img.to(device)
-                        original_seg = original_seg.to(device)
-                        zoom_seg = zoom_seg.to(device)
-                        res_encoder_output = backbone_oi(img)
-
-                        cla_out = cla_net(res_encoder_output, zoom_seg, original_seg)
-
-                        cla_loss += criterion_cla(cla_out, cla_label)
-
-                        gt.append(cla_label.cpu())
-                        cla_pred.append(F.softmax(cla_out, dim=-1).argmax(1, keepdim=True).cpu())
-                    else:
-                        raise ValueError("Both of 'train_seg' and 'train_cla' are False")
-
-                w_s, w_cam, w_c = criterion_weight
-                loss = w_s * seg_loss + w_c * cla_loss
-
-                running_loss.update(loss, bs)
-                running_loss_seg.update(seg_loss, bs)
-                running_loss_cla.update(cla_loss, bs)
-
-                # if train_cla:
-                #     gt.append(cla_label.cpu())
-                #     cla_pred.append(F.softmax(cla_out, dim=-1).argmax(1, keepdim=True).cpu())
-
-            if train_cla:
-                gt = torch.cat(gt, dim=0)
-                cla_pred = torch.cat(cla_pred, dim=0)
-                metrics_cla_values = {k: m(gt, cla_pred) for k, m in metrics_cla.items()}
-            else:
-                metrics_cla_values = {k: 0 for k in metrics_cla}
-
-            print("Test results:")
-            print("Loss: total-{}_segmentation-{}_classification-{}.".format(
-                running_loss.avg, running_loss_seg.avg, running_loss_cla.avg
-            ))
-            print("Metrics:", {k: metrics_seg_values[k].avg for k in metrics_seg_values}, metrics_cla_values)
-            test_writer.add_scalar("Loss/total", running_loss.avg, epoch)
-            test_writer.add_scalar("Loss/segmentation", running_loss_seg.avg, epoch)
-            test_writer.add_scalar("Loss/classification", running_loss_cla.avg, epoch)
-            logger.logger.info('%d epoch test total loss: %.3f \n' % (epoch, running_loss.avg))
-            logger.logger.info('%d epoch test segmentation loss: %.3f \n' % (epoch, running_loss_seg.avg))
-            logger.logger.info('%d epoch test classification loss: %.3f \n' % (epoch, running_loss_cla.avg))
+        if epoch % 5 == 0:
+            print("Start testing...")
+            logger.logger.info('Start testing......\n')
+            s_t = time.time()
+            seg_net.eval()
+            cla_net.eval()
+            running_loss.reset()
+            running_loss_seg.reset()
+            running_loss_cla.reset()
             for k in metrics_seg_values:
-                test_writer.add_scalar("Metrics_seg/" + k, metrics_seg_values[k].avg, epoch)
-                logger.logger.info('%d epoch Metrics_seg/{}: %.3f \n'.format(k) % (epoch, metrics_seg_values[k].avg))
-            for k in metrics_cla_values:
-                test_writer.add_scalar("Metrics_cla/" + k, metrics_cla_values[k], epoch)
-                logger.logger.info('%d epoch Metrics_cla/{}: %.3f \n'.format(k) % (epoch, metrics_cla_values[k]))
+                metrics_seg_values[k].reset()
 
-            for k in best_metric:
-                if k in metrics_seg_values and metrics_seg_values[k].avg > best_metric[k]["value"]:
-                    print('{} increased ({:.6f} --> {:.6f}).'.format(k, best_metric[k]["value"],
-                                                                     metrics_seg_values[k].avg))
-                    torch.save(cla_net.state_dict(), os.path.join(model_dir, "max_{}-cla_net.pkl".format(k)))
-                    torch.save(seg_net.state_dict(), os.path.join(model_dir, "max_{}-seg_net.pkl".format(k)))
-                    best_metric[k]["value"] = metrics_seg_values[k].avg
-                    best_metric[k]["epoch"] = epoch
-                if k in metrics_cla_values and metrics_cla_values[k] > best_metric[k]["value"]:
-                    print('{} increased ({:.6f} --> {:.6f}).'.format(k, best_metric[k]["value"], metrics_cla_values[k]))
-                    torch.save(cla_net.state_dict(), os.path.join(model_dir, "max_{}-cla_net.pkl".format(k)))
-                    torch.save(seg_net.state_dict(), os.path.join(model_dir, "max_{}-seg_net.pkl".format(k)))
-                    best_metric[k]["value"] = metrics_cla_values[k]
-                    best_metric[k]["epoch"] = epoch
+            gt = []
+            cla_pred = []
 
-        with open(os.path.join(model_dir, "best_metrics.json"), "w") as f:
-            json.dump(best_metric, f)
+            with torch.no_grad():
+
+                for batch_idx, (img, seg_label, cla_label) in tqdm(enumerate(test_data_loader), total=len(test_data_loader)):
+                    if batch_idx > 100:
+                        break
+                    bs, c, h, w, d = img.shape
+                    img = img.to(device)
+                    seg_label = seg_label.to(device)
+                    cla_label = cla_label.to(device)
+
+                    seg_loss = 0
+                    cla_loss = 0
+                    if train_seg:
+                        res_encoder_output = backbone_oi(img)
+                        pred_mask = seg_net(res_encoder_output)
+                        #pred_mask = activation(pred_mask)
+                        seg_loss += criterion_seg(pred_mask, seg_label)
+                        pred_mask = torch.where(pred_mask > 0.5, 1, 0).byte()
+
+                        if train_cla:
+                            original_seg, zoom_seg = generate_patch_mask(img, pred_mask)
+                            original_seg = original_seg.to(device)
+                            zoom_seg = zoom_seg.to(device)
+
+                            cla_out = cla_net(res_encoder_output, zoom_seg, original_seg)
+
+                            cla_loss += criterion_cla(cla_out, cla_label)
+
+                            gt.append(cla_label.cpu())
+                            cla_pred.append(F.softmax(cla_out, dim=-1).argmax(1, keepdim=True).cpu())
+
+                        seg_label = seg_label.byte()
+                        for k in metrics_seg:
+                            res = metrics_seg[k](pred_mask, seg_label)
+                            if type(res) == torch.Tensor and res.shape[0] > 0:
+                                res = torch.mean(res[~torch.isnan(res)])
+                            metrics_seg_values[k].update(res, bs)
+
+                    else:
+                        if train_cla:
+                            original_seg, zoom_seg = generate_patch_mask(img, seg_label)
+                            img = img.to(device)
+                            original_seg = original_seg.to(device)
+                            zoom_seg = zoom_seg.to(device)
+                            res_encoder_output = backbone_oi(img)
+
+                            cla_out = cla_net(res_encoder_output, zoom_seg, original_seg)
+
+                            cla_loss += criterion_cla(cla_out, cla_label)
+
+                            gt.append(cla_label.cpu())
+                            cla_pred.append(F.softmax(cla_out, dim=-1).argmax(1, keepdim=True).cpu())
+                        else:
+                            raise ValueError("Both of 'train_seg' and 'train_cla' are False")
+
+                    w_s, w_cam, w_c = criterion_weight
+                    loss = w_s * seg_loss + w_c * cla_loss
+
+                    running_loss.update(loss, bs)
+                    running_loss_seg.update(seg_loss, bs)
+                    running_loss_cla.update(cla_loss, bs)
+
+                    # if train_cla:
+                    #     gt.append(cla_label.cpu())
+                    #     cla_pred.append(F.softmax(cla_out, dim=-1).argmax(1, keepdim=True).cpu())
+
+                if train_cla:
+                    gt = torch.cat(gt, dim=0)
+                    cla_pred = torch.cat(cla_pred, dim=0)
+                    metrics_cla_values = {k: m(gt, cla_pred) for k, m in metrics_cla.items()}
+                else:
+                    metrics_cla_values = {k: 0 for k in metrics_cla}
+
+                print("Test results:")
+                print("Loss: total-{}_segmentation-{}_classification-{}.".format(
+                    running_loss.avg, running_loss_seg.avg, running_loss_cla.avg
+                ))
+                print("Metrics:", {k: metrics_seg_values[k].avg for k in metrics_seg_values}, metrics_cla_values)
+                test_writer.add_scalar("Loss/total", running_loss.avg, epoch)
+                test_writer.add_scalar("Loss/segmentation", running_loss_seg.avg, epoch)
+                test_writer.add_scalar("Loss/classification", running_loss_cla.avg, epoch)
+                logger.logger.info('%d epoch test total loss: %.3f \n' % (epoch, running_loss.avg))
+                logger.logger.info('%d epoch test segmentation loss: %.3f \n' % (epoch, running_loss_seg.avg))
+                logger.logger.info('%d epoch test classification loss: %.3f \n' % (epoch, running_loss_cla.avg))
+                for k in metrics_seg_values:
+                    test_writer.add_scalar("Metrics_seg/" + k, metrics_seg_values[k].avg, epoch)
+                    logger.logger.info('%d epoch Metrics_seg/{}: %.3f \n'.format(k) % (epoch, metrics_seg_values[k].avg))
+                for k in metrics_cla_values:
+                    test_writer.add_scalar("Metrics_cla/" + k, metrics_cla_values[k], epoch)
+                    logger.logger.info('%d epoch Metrics_cla/{}: %.3f \n'.format(k) % (epoch, metrics_cla_values[k]))
+
+                for k in best_metric:
+                    if k in metrics_seg_values and metrics_seg_values[k].avg > best_metric[k]["value"]:
+                        print('{} increased ({:.6f} --> {:.6f}).'.format(k, best_metric[k]["value"],
+                                                                         metrics_seg_values[k].avg))
+                        torch.save(cla_net.state_dict(), os.path.join(model_dir, "max_{}-cla_net.pkl".format(k)))
+                        torch.save(seg_net.state_dict(), os.path.join(model_dir, "max_{}-seg_net.pkl".format(k)))
+                        best_metric[k]["value"] = metrics_seg_values[k].avg
+                        best_metric[k]["epoch"] = epoch
+                    if k in metrics_cla_values and metrics_cla_values[k] > best_metric[k]["value"]:
+                        print('{} increased ({:.6f} --> {:.6f}).'.format(k, best_metric[k]["value"], metrics_cla_values[k]))
+                        torch.save(cla_net.state_dict(), os.path.join(model_dir, "max_{}-cla_net.pkl".format(k)))
+                        torch.save(seg_net.state_dict(), os.path.join(model_dir, "max_{}-seg_net.pkl".format(k)))
+                        best_metric[k]["value"] = metrics_cla_values[k]
+                        best_metric[k]["epoch"] = epoch
+
+            with open(os.path.join(model_dir, "best_metrics.json"), "w") as f:
+                json.dump(best_metric, f)
 
 
 if __name__ == '__main__':
@@ -410,7 +413,7 @@ if __name__ == '__main__':
     parser.add_argument('--pretrain_cla', type=str, default='None')
     parser.add_argument('--input_path', type=str, default='/home/KidneyData/data')
     parser.add_argument('--output_path', type=str, default='./results')
-    parser.add_argument('--input_size', type=tuple, default=(256, 256, 256))
+    parser.add_argument('--resize_rate', type=float, default=0.25)
     parser.add_argument('--num_classes', type=int, default=2)
     parser.add_argument('--epochs', type=int, default=10)
     parser.add_argument('--save_epoch', type=int, default=3)

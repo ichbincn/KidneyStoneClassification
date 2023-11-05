@@ -108,5 +108,5 @@ def data2nii(info_dir, save_dir):
 if __name__ == '__main__':
     # data_dir = r'C:\Users\Asus\Desktop\肺腺癌\data\肾结石数据\KdneyStone\202310326结石成分分析龙岗区人民医院李星智'
     data_dir = '/home/fanchenchenzc/datasets/202310326结石成分分析龙岗区人民医院李星智'
-    # map_data(data_dir)
+    map_data(data_dir)
     data2nii(info_dir=data_dir, save_dir=data_dir)

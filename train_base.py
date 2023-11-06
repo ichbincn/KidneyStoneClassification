@@ -151,7 +151,6 @@ class Trainer:
             self.model.load_state_dict(torch.load(self.args.MODEL_WEIGHT)['model_state_dict'])
             print('load model weight success!')
 
-
     def evaluate(self):
         self.model.eval()
         total_step = 0
@@ -196,7 +195,6 @@ class Trainer:
                 }
                 torch.save(checkpoint, os.path.join(self.args.save_dir, 'best_checkpoint.pth'))
                 logger.logger.info('save best model  successed......\n')
-
 
     def train_one_epoch(self):
         self.per_epoch_loss = 0

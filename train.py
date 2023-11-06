@@ -65,7 +65,7 @@ def main(args, logger):
     test_writer = SummaryWriter(os.path.join(summary_dir, 'test'), flush_secs=2)
 
     #model
-    img_size = tuple([int((512*args.resize_rate) // 8) for i in range(3)])
+    img_size = tuple([i// 8 for i in args.input_size])
     # print("model img_size input:",img_size)
     seg_net = SC_Net(in_channels=384, out_channels=None, img_size=img_size)
     backbone_oi = ResEncoder(depth=4, in_channels=1)
@@ -142,13 +142,13 @@ def main(args, logger):
                                batch_size=args.batch_size,
                                shuffle=True,
                                num_workers=args.num_workers,
-                               resize_rate=args.resize_rate)
+                               input_size=args.input_size)
     test_data_loader = my_dataloader(args.input_path,
                             val_info,
                             batch_size=args.batch_size,
                             shuffle=False,
                             num_workers=args.num_workers,
-                            resize_rate=args.resize_rate)
+                            input_size=args.input_size)
     #########################
 
     print("Start training")
@@ -413,7 +413,7 @@ if __name__ == '__main__':
     parser.add_argument('--pretrain_cla', type=str, default='None')
     parser.add_argument('--input_path', type=str, default='/home/KidneyData/data')
     parser.add_argument('--output_path', type=str, default='./results')
-    parser.add_argument('--resize_rate', type=float, default=0.25)
+    parser.add_argument('--input_size', type=str, default=(128, 128, 128))
     parser.add_argument('--num_classes', type=int, default=2)
     parser.add_argument('--epochs', type=int, default=10)
     parser.add_argument('--save_epoch', type=int, default=3)

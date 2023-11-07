@@ -53,9 +53,6 @@ class MyDataset(Dataset):
             img, mask = self.val_preprocess(img, mask)
         label = self.labels[i]
 
-        img = np.transpose(img, (2, 1, 0))
-        mask = np.transpose(mask, (2, 1, 0))
-
         img = torch.tensor(img, dtype=torch.float32).unsqueeze(0)
         mask = torch.tensor(mask, dtype=torch.uint8).unsqueeze(0)
 
@@ -143,6 +140,8 @@ class MyDataset(Dataset):
         return (img - avg + std) / (std * 2)
 
     def resize(self, img, mask):
+        img = np.transpose(img, (2, 1, 0))
+        mask = np.transpose(mask, (2, 1, 0))
         rate = np.array(self.input_size) / np.array(img.shape)
         img = zoom(img, rate.tolist(), order=0)
         mask = zoom(mask, rate.tolist(), order=0, mode='nearest')

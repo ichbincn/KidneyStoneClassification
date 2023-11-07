@@ -174,8 +174,8 @@ def main(args, logger):
         cla_pred = []
 
         for batch_idx, (img, seg_label, cla_label) in tqdm(enumerate(train_data_loader), total=len(train_data_loader)):
-            if batch_idx > 100:
-                break
+            # if batch_idx > 100:
+            #     break
             bs, c, h, w, d = img.shape
             img = img.to(device)
             seg_label = seg_label.to(device)
@@ -187,7 +187,6 @@ def main(args, logger):
             if train_seg:
                 res_encoder_output = backbone_oi(img)
                 pred_mask = seg_net(res_encoder_output)
-                #pred_mask = activation(pred_mask)
                 seg_loss += criterion_seg(pred_mask, seg_label)
                 pred_mask = torch.where(pred_mask > 0.5, 1, 0).byte()
 
@@ -211,6 +210,7 @@ def main(args, logger):
                     res = metrics_seg[k](pred_mask, seg_label)
                     if type(res) == torch.Tensor and res.shape[0] > 0:
                         res = torch.mean(res[~torch.isnan(res)])
+
                     metrics_seg_values[k].update(res, bs)
 
             else:
@@ -298,8 +298,8 @@ def main(args, logger):
             with torch.no_grad():
 
                 for batch_idx, (img, seg_label, cla_label) in tqdm(enumerate(test_data_loader), total=len(test_data_loader)):
-                    if batch_idx > 100:
-                        break
+                    # if batch_idx > 100:
+                    #     break
                     bs, c, h, w, d = img.shape
                     img = img.to(device)
                     seg_label = seg_label.to(device)
@@ -416,7 +416,7 @@ if __name__ == '__main__':
     parser.add_argument('--input_size', type=str, default=(128, 128, 128))
     parser.add_argument('--num_classes', type=int, default=2)
     parser.add_argument('--epochs', type=int, default=10)
-    parser.add_argument('--save_epoch', type=int, default=3)
+    parser.add_argument('--save_epoch', type=int, default=10)
     parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--device', type=str, default='cuda')
     parser.add_argument('--lr', type=float, default=0.001)

@@ -97,8 +97,7 @@ class SC_Net(nn.Module):
         img_size: Union[Sequence[int], int],
         depths: Sequence[int] = (2, 2, 2, 2),
         feature_size: int = 16,
-        # hidden_size: int = 768,
-        hidden_size: int = 384,
+        hidden_size: int = 768,
         mlp_dim: int = 3072,
         num_heads: int = 8,
         #num_classes: int = 16,
@@ -147,17 +146,17 @@ class SC_Net(nn.Module):
         self.transposeconv_stage1 = nn.ConvTranspose3d(256,128,kernel_size=(2,2,2), stride=(2,2,2), bias=False)
         self.transposeconv_stage0 = nn.ConvTranspose3d(128,64,kernel_size=(2,2,2), stride=(2,2,2), bias=False)
 
-        self.transposeconv_skip3 = nn.ConvTranspose3d(384,256,kernel_size=(2,2,2), stride=(2,2,2), bias=False)
-        self.transposeconv_skip2 =  nn.ConvTranspose3d(384,256,kernel_size=(2,2,2), stride=(2,2,2), bias=False)
-        self.transposeconv_skip1_1 =  nn.ConvTranspose3d(384,256,kernel_size=(2,2,2), stride=(2,2,2), bias=False)
-        self.transposeconv_skip1_2 =  nn.ConvTranspose3d(256,128,kernel_size=(2,2,2), stride=(2,2,2), bias=False)
-        self.transposeconv_skip0_1 =  nn.ConvTranspose3d(384,256,kernel_size=(2,2,2), stride=(2,2,2), bias=False)
-        self.transposeconv_skip0_2 =  nn.ConvTranspose3d(256,128,kernel_size=(2,2,2), stride=(2,2,2), bias=False)
-        self.transposeconv_skip0_3 =  nn.ConvTranspose3d(128,64,kernel_size=(2,2,2), stride=(2,2,2), bias=False)
+        self.transposeconv_skip3 = nn.ConvTranspose3d(768,512,kernel_size=(2,2,2), stride=(2,2,2), bias=False)
+        self.transposeconv_skip2 =  nn.ConvTranspose3d(768,512,kernel_size=(2,2,2), stride=(2,2,2), bias=False)
+        self.transposeconv_skip1_1 =  nn.ConvTranspose3d(768,512,kernel_size=(2,2,2), stride=(2,2,2), bias=False)
+        self.transposeconv_skip1_2 =  nn.ConvTranspose3d(512,256,kernel_size=(2,2,2), stride=(2,2,2), bias=False)
+        self.transposeconv_skip0_1 =  nn.ConvTranspose3d(768,512,kernel_size=(2,2,2), stride=(2,2,2), bias=False)
+        self.transposeconv_skip0_2 =  nn.ConvTranspose3d(512,256,kernel_size=(2,2,2), stride=(2,2,2), bias=False)
+        self.transposeconv_skip0_3 =  nn.ConvTranspose3d(256,128,kernel_size=(2,2,2), stride=(2,2,2), bias=False)
 
-        self.stage2_de = ResBlock(896,512,norm_cfg, activation_cfg, weight_std=weight_std)
-        self.stage1_de = ResBlock(768,256,norm_cfg, activation_cfg, weight_std=weight_std)
-        self.stage0_de = ResBlock(384,128,norm_cfg, activation_cfg, weight_std=weight_std)
+        self.stage2_de = ResBlock(1408,512,norm_cfg, activation_cfg, weight_std=weight_std)
+        self.stage1_de = ResBlock(896,256,norm_cfg, activation_cfg, weight_std=weight_std)
+        self.stage0_de = ResBlock(448,128,norm_cfg, activation_cfg, weight_std=weight_std)
 
         self.cls_conv = nn.Conv3d(64, 1, kernel_size=1)
 

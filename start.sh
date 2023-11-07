@@ -7,4 +7,4 @@
 #SBATCH --reservation=root_114
 
 
-python train.py --batch_size 2 --epochs 30 --save_epoch 5 --resize_rate 1 --input_path /mntcephfs/lab_data/wangcm/fan/data
+python train.py --epochs 30 --input_size "128,128,128" --batch_size 2 --input_path /mntcephfs/lab_data/wangcm/fan/data

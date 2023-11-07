@@ -3,7 +3,7 @@ import time
 import os
 import argparse
 import json
-
+import re
 import torch.nn.functional as F
 import monai.losses
 from monai.bundle import ConfigParser
@@ -65,7 +65,7 @@ def main(args, logger):
     test_writer = SummaryWriter(os.path.join(summary_dir, 'test'), flush_secs=2)
 
     #model
-    img_size = tuple([i// 8 for i in args.input_size])
+    img_size = tuple([int(i)// 8 for i in re.findall('\d+',args.input_size)])
     # print("model img_size input:",img_size)
     seg_net = SC_Net(in_channels=384, out_channels=None, img_size=img_size)
     backbone_oi = ResEncoder(depth=4, in_channels=1)

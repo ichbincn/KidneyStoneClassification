@@ -53,7 +53,10 @@ class MyDataset(Dataset):
             img, mask = self.val_preprocess(img, mask)
         label = self.labels[i]
 
-        img = torch.tensor(img).unsqueeze(0)
+        img = np.transpose(img, (2, 1, 0))
+        mask = np.transpose(mask, (2, 1, 0))
+
+        img = torch.tensor(img, dtype=torch.float32).unsqueeze(0)
         mask = torch.tensor(mask, dtype=torch.uint8).unsqueeze(0)
 
         return img, mask, label
@@ -61,10 +64,12 @@ class MyDataset(Dataset):
     def train_preprocess(self, img, mask):
         img = self.resample(img)
         mask = self.resample(mask)
+        # print(img.shape, mask.shape)
         assert img.shape == mask.shape, "img and mask shape not match"
         img, mask = self.crop(img, mask)
         img = self.normalize(img)
         img, mask = self.resize(img, mask)
+
         return img, mask
     def val_preprocess(self, img, mask):
         img = self.resample(img)
@@ -73,27 +78,7 @@ class MyDataset(Dataset):
         # img, mask = self.crop(img, mask)
         img = self.normalize(img)
         img, mask = self.resize(img, mask)
-        return img, mask
 
-    def preprocess(self, img, mask):
-        # img, mask = self.crop(img, mask)
-        # img = resize(img, self.size2)
-        # mask = resize(mask, self.size2)
-        print(mask.shape, mask.sum())
-        img = resize(img, (512, 512, 512))
-        mask = resize(mask, (512, 512, 512), order=0)
-        print(mask.shape, mask.sum())
-        img = zoom(img, self.resize_rate, order=0)
-        mask = zoom(mask, self.resize_rate, order=0, mode='nearest')
-        # img = zoom(img, (1, 1, 0.25), order=0)
-        # mask = zoom(mask, (1, 1, 0.25), order=0, mode='nearest')
-        print(mask.shape, mask.sum())
-        img = (img/255).astype(np.float32)
-        if np.min(img) < np.max(img):
-            img = img - np.min(img)
-            img = img / np.max(img)
-        img = torch.tensor(img).unsqueeze(0)
-        mask = torch.tensor(mask, dtype=torch.uint8).unsqueeze(0)
         return img, mask
 
     def crop(self, img, mask):
@@ -133,14 +118,14 @@ class MyDataset(Dataset):
         return crop_img, crop_mask
 
     def resample(self, itkimage, new_spacing=[1, 1, 1]):
-        spacing = itkimage.GetSpacing()
+        # spacing = itkimage.GetSpacing()
         img_array = sitk.GetArrayFromImage(itkimage)
-        resize_factor = spacing / np.array(new_spacing)
-        new_real_shape = img_array.shape * resize_factor
-        new_shape = np.round(new_real_shape)
-        real_resize_factor = new_shape / img_array.shape
-        new_spacing = spacing / real_resize_factor
-        img = zoom(img_array, real_resize_factor, mode='nearest')
+        # resize_factor = spacing / np.array(new_spacing)
+        # new_real_shape = img_array.shape * resize_factor
+        # new_shape = np.round(new_real_shape)
+        # real_resize_factor = new_shape / img_array.shape
+        # new_spacing = spacing / real_resize_factor
+        # img = zoom(img_array, real_resize_factor, mode='nearest')
         # resampler = sitk.ResampleImageFilter()
         # originSize = itkimage.GetSize()  # 原来的体素块尺寸
         # # newSize = np.array(newSize, float)
@@ -150,7 +135,7 @@ class MyDataset(Dataset):
         # resampler.SetTransform(sitk.Transform(3, sitk.sitkIdentity))
         # resampler.SetInterpolator(resamplemethod)
         # itkimgResampled = resampler.Execute(itkimage)  # 得到重新采样后的图像
-        return img
+        return img_array
 
     def normalize(self, img):
         std = np.std(img)

@@ -178,7 +178,7 @@ class SC_Net(nn.Module):
         self.proj_axes = (0, spatial_dims + 1) + tuple(d + 1 for d in range(spatial_dims))
         self.proj_view_shape = list(self.feat_size) + [self.hidden_size]
 
-<<<<<<< HEAD
+#<<<<<<< HEAD
     def proj_feat(self, x):
         new_view = [x.size(0)] + self.proj_view_shape
         x = x.view(new_view)

@@ -154,14 +154,14 @@ def my_dataloader(data_dir, infos, batch_size=3, shuffle=True, num_workers=0, in
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers)
     return dataloader
 
-data_dir = r'C:\Users\Asus\Desktop\data'
-#
-train_info, test_info = split_data(data_dir, rate=0.8)
-train_dataloader = my_dataloader(data_dir, train_info, input_size=(128, 128, 128))
-test_dataloader = my_dataloader(data_dir, test_info, input_size=(128, 128, 128))
-for i, (image, mask, label) in enumerate(train_dataloader):
-    print(i,image.shape, mask.shape, label)
-    break
+# data_dir = r'C:\Users\Asus\Desktop\data'
+# #
+# train_info, test_info = split_data(data_dir, rate=0.8)
+# train_dataloader = my_dataloader(data_dir, train_info, input_size=(128, 128, 128))
+# test_dataloader = my_dataloader(data_dir, test_info, input_size=(128, 128, 128))
+# for i, (image, mask, label) in enumerate(train_dataloader):
+#     print(i,image.shape, mask.shape, label)
+#     break
 #     print(mask.sum())
 # #
 #

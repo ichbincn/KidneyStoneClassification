@@ -134,7 +134,7 @@ class Trainer:
         self.loss_function = torch.nn.CrossEntropyLoss()
 
     def __call__(self):
-        for epoch in range(self.epochs):
+        for epoch in tqdm(range(self.epochs)):
             start = time.time()
             self.train_one_epoch()
             self.num_params = sum([param.nelement() for param in self.model.parameters()])
@@ -157,7 +157,7 @@ class Trainer:
         per_epoch_loss = 0
         per_epoch_num_correct = 0
         with torch.no_grad():
-            for inx, (x, mask, label) in enumerate(self.test_loader):
+            for inx, (x, mask, label) in tqdm(enumerate(self.test_loader)):
                 x = x.to(self.device)
                 label = label.to(self.device)
                 total_step += x.shape[0]
@@ -201,7 +201,7 @@ class Trainer:
         self.total_step = 0
         self.num_correct = 0
         self.model.train()
-        for inx, (x, mask, label) in enumerate(self.train_loader):
+        for inx, (x, mask, label) in tqdm(enumerate(self.train_loader)):
             x = x.to(self.device)
             label = label.to(self.device)
             logits = self.model(x)
@@ -234,12 +234,13 @@ def main(args, logger):
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     scheduler = ExponentialLR(optimizer, gamma=0.99)
-    data_dir = r'C:\Users\Asus\Desktop\肺腺癌\data\肾结石数据\KdneyStone\202310326结石成分分析龙岗区人民医院李星智'
-    if not os.path.exists(data_dir):
-        data_dir = '/home/wangchangmiao/kidney/data/data'
+    # data_dir = r'C:\Users\Asus\Desktop\肺腺癌\data\肾结石数据\KdneyStone\202310326结石成分分析龙岗区人民医院李星智'
+    # if not os.path.exists(data_dir):
+    #     data_dir = '/home/wangchangmiao/kidney/data/data'
+    data_dir = args.input_path
     train_infos, val_infos = split_data(data_dir)
-    train_loader = my_dataloader(data_dir, train_infos, batch_size=args.batch_size, resize_rate=args.resize_rate)
-    val_loader = my_dataloader(data_dir, val_infos, batch_size=args.batch_size, resize_rate=args.resize_rate)
+    train_loader = my_dataloader(data_dir, train_infos, batch_size=args.batch_size, input_size=args.input_size)
+    val_loader = my_dataloader(data_dir, val_infos, batch_size=args.batch_size, input_size=args.input_size)
     logger.logger.info('start training......\n')
     summaryWriter = SummaryWriter(log_dir=args.log_dir)
     trainer = Trainer(model,
@@ -262,7 +263,8 @@ if __name__ == '__main__':
     parser.add_argument('--log_dir', type=str, default='./Logs')
     parser.add_argument('--save_dir', type=str, default='./models')
     parser.add_argument('--num_workers', type=int, default=0)
-    parser.add_argument('--input_size', type=float, default=0.25)
+    parser.add_argument('--input_size', type=float, default=(128, 128, 128))
+    parser.add_argument('--input_path', type=str, default='/home/wangchangmiao/kidney/data/data')
     parser.add_argument('--MODEL_WEIGHT', type=str, default=None)
 
     opt = parser.parse_args()

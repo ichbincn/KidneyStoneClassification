@@ -419,7 +419,7 @@ if __name__ == '__main__':
     parser.add_argument('--save_epoch', type=int, default=10)
     parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--device', type=str, default='cuda')
-    parser.add_argument('--lr', type=float, default=0.001)
+    parser.add_argument('--lr', type=float, default=0.01)
     parser.add_argument('--betas', type=tuple, default=(0.9, 0.999))
     parser.add_argument('--weight_decay', type=float, default=0.01)
     parser.add_argument('--milestones', type=list, default=[100])

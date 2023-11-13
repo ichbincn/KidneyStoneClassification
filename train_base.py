@@ -15,16 +15,16 @@ import torch
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 import torch.optim.lr_scheduler as lr_scheduler
-import sys
+
 from tqdm import tqdm
 import torch
-from torch.utils import data
+
 from torch.optim.lr_scheduler import ExponentialLR
 import torch.nn as nn
 from src.dataloader.load_data import split_data, my_dataloader
 
 from torch.nn.parallel import DataParallel
-from torchvision import models
+
 
 
 
@@ -119,7 +119,7 @@ class Logger:
 
 
 class Trainer:
-    def __init__(self, model, optimizer, device, train_loader, test_loader, epochs, scheduler, args):
+    def __init__(self, model, optimizer, device, train_loader, test_loader, epochs, scheduler, args, summaryWriter):
         self.model = model
         self.optimizer = optimizer
         self.scheduler = scheduler
@@ -132,14 +132,16 @@ class Trainer:
         self.args = args
         self.load_model()
         self.loss_function = torch.nn.CrossEntropyLoss()
+        self.summaryWriter = summaryWriter
 
     def __call__(self):
         for epoch in tqdm(range(self.epochs)):
             start = time.time()
+            self.epoch = epoch+1
             self.train_one_epoch()
             self.num_params = sum([param.nelement() for param in self.model.parameters()])
             self.scheduler.step()
-            self.epoch = epoch
+
             end = time.time()
             print("Epoch: {}, train time: {}".format(epoch, end - start))
             if epoch % 1 == 0:
@@ -157,7 +159,7 @@ class Trainer:
         per_epoch_loss = 0
         per_epoch_num_correct = 0
         with torch.no_grad():
-            for inx, (x, mask, label) in tqdm(enumerate(self.test_loader)):
+            for inx, (x, mask, label) in tqdm(enumerate(self.test_loader), total=len(self.test_loader)):
                 x = x.to(self.device)
                 label = label.to(self.device)
                 total_step += x.shape[0]
@@ -167,7 +169,10 @@ class Trainer:
                 pred = logits.argmax(dim=1)
                 per_epoch_num_correct += torch.eq(pred, label).sum().item()
             test_acc = per_epoch_num_correct / total_step
-            print(f'TEST: Epoch:{self.epoch}/{self.epochs}, Loss:{per_epoch_loss/total_step}, acc:{test_acc}')
+            print(f'TEST: Epoch:{self.epoch}/{self.epochs}, Loss:{per_epoch_loss/(inx+1)}, acc:{test_acc}')
+            self.summaryWriter.add_scalar("Loss/TEST", per_epoch_loss/len(self.test_loader), self.epoch)
+            self.summaryWriter.add_scalar("acc/TEST", test_acc, self.epoch)
+
 
             if self.epoch % self.args.save_epoch == 0:
                 checkpoint = {
@@ -197,27 +202,30 @@ class Trainer:
                 logger.logger.info('save best model  successed......\n')
 
     def train_one_epoch(self):
-        self.per_epoch_loss = 0
-        self.total_step = 0
-        self.num_correct = 0
+        per_epoch_loss = 0
+        total_step = 0
+        num_correct = 0
         self.model.train()
-        for inx, (x, mask, label) in tqdm(enumerate(self.train_loader)):
+        for inx, (x, mask, label) in tqdm(enumerate(self.train_loader), total=len(self.train_loader)):
             x = x.to(self.device)
             label = label.to(self.device)
             logits = self.model(x)
 
             loss = self.loss_function(logits, label)
-            self.per_epoch_loss += loss.item()
-            self.total_step += x.shape[0]
+            per_epoch_loss += loss.item()
+            total_step += x.shape[0]
             # Backward and optimize
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
             pred = logits.argmax(dim=1)
             # print(f'logits:{logits}, pred:{pred}, label:{label}')
-            self.num_correct += torch.eq(pred, label).sum().item()
-            if inx % 5 == 0:
-                print(f'iters:{inx}/{len(self.train_loader)}, Loss:{loss.item()}, acc:{self.num_correct/self.total_step}')
+            num_correct += torch.eq(pred, label).sum().item()
+            # if inx % 5 == 0:
+            # print(f'iters:{inx}/{len(self.train_loader)}, Loss:{loss.item()}, acc:{num_correct/total_step}')
+        self.summaryWriter.add_scalar("Loss/TRAIN", per_epoch_loss / len(self.train_loader), self.epoch)
+        self.summaryWriter.add_scalar("acc/TRAIN", num_correct/total_step, self.epoch)
+        print(f'train epoch:{self.epoch}/{self.epochs}, Loss:{per_epoch_loss / len(self.train_loader)}, acc:{num_correct / total_step}')
 
 def main(args, logger):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -243,6 +251,8 @@ def main(args, logger):
     val_loader = my_dataloader(data_dir, val_infos, batch_size=args.batch_size, input_size=args.input_size)
     logger.logger.info('start training......\n')
     summaryWriter = SummaryWriter(log_dir=args.log_dir)
+    # train_writer = SummaryWriter(os.path.join(summary_dir, 'train'), flush_secs=2)
+    # test_writer = SummaryWriter(os.path.join(summary_dir, 'test'), flush_secs=2)
     trainer = Trainer(model,
                       optimizer,
                       device,
@@ -250,7 +260,8 @@ def main(args, logger):
                       val_loader,
                       args.epochs,
                       scheduler,
-                      args)
+                      args,
+                      summaryWriter)
     trainer()
 
 if __name__ == '__main__':

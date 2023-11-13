@@ -16,28 +16,49 @@ from scipy.ndimage import zoom
 import SimpleITK as sitk
 from scipy.ndimage import zoom
 
+from collections import defaultdict
+
+
 def split_data(data_dir, rate=0.8):
     with open(os.path.join(data_dir, 'infos.json'), 'r') as f:
         infos = json.load(f)
-    random.seed(1900)
-    random.shuffle(infos)
-    num_samples = len(infos)
-    train_num = int(rate * num_samples)
-    train_infos = infos[:train_num]
-    test_infos = infos[train_num:]
+
+    # 创建一个字典，用于按类别存储数据
+    class_data = defaultdict(list)
+    for info in infos:
+        label = info['label']  # 假设数据集中每个样本都有'label'字段表示类别
+        class_data[label].append(info)
+
+    train_infos = []
+    test_infos = []
+
+    # 对每个类别进行分层抽样
+    for label, data in class_data.items():
+        random.seed(1900)
+        random.shuffle(data)
+        num_samples = len(data)
+        train_num = int(rate * num_samples)
+        train_infos.extend(data[:train_num])
+        test_infos.extend(data[train_num:])
 
     return train_infos, test_infos
 
 class MyDataset(Dataset):
-    def __init__(self, data_dir, infos, input_size, phase='train'):
+    def __init__(self, data_dir, infos, input_size, phase='train', task=[0, 1]):
+        '''
+        task: 0 :cla,  1 :seg
+        '''
         img_dir = os.path.join(data_dir, 'imgs_nii')
         mask_dir = os.path.join(data_dir, 'mask_nii')
 
         self.input_size = tuple([int(i) for i in re.findall('\d+', str(input_size))])
         self.img_dir = img_dir
-        self.mask_dir = mask_dir
+        if 0 in task:
+            self.labels = [i['label'] for i in infos]
+        if 1 in task:
+            self.mask_dir = mask_dir
         # self.labels = [[1, 0] if int(i['label']) == 1 else [0, 1] for i in infos]
-        self.labels = [i['label'] for i in infos]
+
         self.ids = [i['id'] for i in infos]
         self.phase = phase
 
@@ -81,6 +102,9 @@ class MyDataset(Dataset):
     def crop(self, img, mask):
         crop_img = img
         crop_mask = mask
+        # amos kidney mask
+        crop_mask[crop_mask == 2] = 1
+        crop_mask[crop_mask != 1] = 0
         target = np.where(crop_mask == 1)
         [d, h, w] = crop_img.shape
         [max_d, max_h, max_w] = np.max(np.array(target), axis=1)
@@ -157,6 +181,7 @@ def my_dataloader(data_dir, infos, batch_size=3, shuffle=True, num_workers=0, in
 # data_dir = r'C:\Users\Asus\Desktop\data'
 # #
 # train_info, test_info = split_data(data_dir, rate=0.8)
+# print(len(train_info), len(test_info))
 # train_dataloader = my_dataloader(data_dir, train_info, input_size=(128, 128, 128))
 # test_dataloader = my_dataloader(data_dir, test_info, input_size=(128, 128, 128))
 # for i, (image, mask, label) in enumerate(train_dataloader):
